@@ -1,3 +1,9 @@
+
+```
+*** DEVELOPMENT IN PROGRESS ***
+*** Please contact me for bugs ***
+```
+
 # Next / React Ethereum Auth Hook
 
 ### Implements metamask functions:

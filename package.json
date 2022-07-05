@@ -33,7 +33,7 @@
     "singleQuote": true,
     "trailingComma": "es5"
   },
-  "name": "react-ethereum-auth",
+  "name": "@marcotommoro/react-ethereum-auth-hook",
   "author": "Marco Moroni",
   "module": "dist/react-ethereum-auth.esm.js",
   "size-limit": [

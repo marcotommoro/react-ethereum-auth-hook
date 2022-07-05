@@ -7,7 +7,6 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { toast } from 'react-toastify';
 import { sign } from 'web3-token';
 import {
   changeNetworkIfNeeded,
@@ -21,6 +20,7 @@ type InitialValues = {
   address: string;
   isMetamaskInstalled: boolean;
   isNetworkCorrect: boolean;
+  currentNetwork: string;
   connect: () => Promise<void>;
   getToken: () => Promise<string | undefined>;
   correctNetwork: () => Promise<void>;
@@ -30,6 +30,7 @@ const EthereumContext = createContext<InitialValues>({
   address: '',
   isMetamaskInstalled: false,
   isNetworkCorrect: false,
+  currentNetwork: '',
   connect(): Promise<void> {
     throw new Error('connectMetamask is not implemented');
   },
@@ -43,14 +44,14 @@ const EthereumContext = createContext<InitialValues>({
 
 type Props = {
   children: React.ReactNode;
-  useDefaultToastAlert: boolean;
+  autoCheckCorrectNetwork?: boolean;
 };
 
 declare let window: any;
 
 export const EthereumContextProvider = ({
   children,
-  useDefaultToastAlert = false,
+  autoCheckCorrectNetwork = true,
 }: Props) => {
   const [ethereum, setEthereum] = useState<any>(null);
   const [address, setAddress] = useState<string>('');
@@ -58,18 +59,15 @@ export const EthereumContextProvider = ({
   const [isMetamaskInstalled, setIsMetamaskInstalled] = useState<boolean>(
     false
   );
+  const [currentNetwork, setCurrentNetwork] = useState<string>('');
 
   const connect = useCallback(async () => {
-    try {
-      if (!isMetamaskInstalled) return;
+    if (!isMetamaskInstalled) return;
 
-      const addr = await connectMetamask(ethereum);
-      await changeNetworkIfNeeded(ethereum);
-      setAddress(addr);
-      setIsNetworkCorrect(true);
-    } catch (error) {
-      console.log(error);
-    }
+    const addr = await connectMetamask(ethereum);
+    await changeNetworkIfNeeded(ethereum);
+    setAddress(addr);
+    setIsNetworkCorrect(true);
   }, [ethereum, isMetamaskInstalled]);
 
   const getToken = useCallback(async () => {
@@ -91,41 +89,43 @@ export const EthereumContextProvider = ({
   }, [ethereum]);
 
   const correctNetwork = useCallback(async () => {
-    try {
-      await changeNetworkIfNeeded(ethereum);
-    } catch (error) {}
+    await changeNetworkIfNeeded(ethereum);
   }, [ethereum]);
 
   useEffect(() => {
-    if (!window.ethereum) return;
+    try {
+      if (!window.ethereum) return;
 
-    setIsMetamaskInstalled(true);
-    setEthereum(window.ethereum);
+      setIsMetamaskInstalled(true);
+      setEthereum(window.ethereum);
 
-    window.ethereum.on('accountsChanged', (accounts: any) => {
-      if (useDefaultToastAlert && accounts.length !== 0 && address.length !== 0)
-        toast.warn('Changed Account!', { toastId: 'changed-account' });
-      setAddress(accounts[0]);
-    });
+      window.ethereum.on('accountsChanged', (accounts: any) => {
+        setAddress(accounts[0]);
+      });
 
-    window.ethereum.on('chainChanged', async (chainId: any) => {
-      try {
-        const isCorrect = checkNetwork(chainId);
-        setIsNetworkCorrect(isCorrect);
+      window.ethereum.on('chainChanged', async (chainId: any) => {
+        setCurrentNetwork(chainId);
+        if (!autoCheckCorrectNetwork) return;
 
-        if (useDefaultToastAlert && !isCorrect)
-          toast.warn('Changed network!', { toastId: 'changed-network' });
-      } catch (error) {
+        try {
+          const isCorrect = checkNetwork(chainId);
+          setIsNetworkCorrect(isCorrect);
+          setCurrentNetwork(chainId);
+        } catch (error) {
+          setAddress('');
+          setIsNetworkCorrect(false);
+          setCurrentNetwork(chainId);
+        }
+      });
+
+      window.ethereum.on('disconnect', async (_: any) => {
         setAddress('');
         setIsNetworkCorrect(false);
-      }
-    });
-
-    window.ethereum.on('disconnect', async (error: any) => {
-      setAddress('');
-      setIsNetworkCorrect(false);
-      console.log('disconnect', error);
-    });
+        setCurrentNetwork('');
+      });
+    } catch (error) {
+      console.log(error);
+    }
   }, [ethereum]);
 
   const contextValues = useMemo(
@@ -136,6 +136,7 @@ export const EthereumContextProvider = ({
       connect,
       getToken,
       correctNetwork,
+      currentNetwork,
     }),
     [
       address,
@@ -144,6 +145,7 @@ export const EthereumContextProvider = ({
       isNetworkCorrect,
       getToken,
       correctNetwork,
+      currentNetwork,
     ]
   );
 
